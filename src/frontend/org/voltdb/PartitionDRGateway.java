@@ -37,7 +37,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public enum DRRecordType {
-        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX;
+        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX, HASH_DELIMITER;
     }
 
     public static enum DRRowType {

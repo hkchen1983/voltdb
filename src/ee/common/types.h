@@ -497,7 +497,8 @@ enum DRRecordType {
     DR_RECORD_END_TXN = 4,
     DR_RECORD_TRUNCATE_TABLE = 5,
     DR_RECORD_DELETE_BY_INDEX = 6,
-    DR_RECORD_UPDATE_BY_INDEX = 7
+    DR_RECORD_UPDATE_BY_INDEX = 7,
+    DR_RECORD_HASH_DELIMITER = 8
 };
 
 inline size_t rowCostForDRRecord(DRRecordType type) {

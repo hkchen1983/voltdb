@@ -26,12 +26,16 @@ class TableIndex;
 
 class DRTupleStream : public voltdb::AbstractDRTupleStream {
 public:
-    //Version(1), type(1), drId(8), uniqueId(8), checksum(4)
-    static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
-    //Version(1), type(1), drId(8), partitionHash(8), checksum(4)
-    static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
-    //Version(1), type(1), table signature(8), checksum(4)
-    static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 8 + 4;
+    //Version(1), type(1), drId(8), uniqueId(8), hashFlag(1), txnLength(4), parHash(8)
+    static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 1 + 4 + 8;
+    //Version(1), type(1), drId(8), uniqueId(8)
+    static const size_t BEGIN_RECORD_HEADER_SIZE = 1 + 1 + 8 + 8;
+    //Type(1), drId(8), checksum(4)
+    static const size_t END_RECORD_SIZE = 1 + 8 + 4;
+    //Type(1), table signature(8)
+    static const size_t TXN_RECORD_HEADER_SIZE = 1 + 8;
+    //Type(1), parHash(8)
+    static const size_t HASH_DELIMITER_SIZE = 1 + 8;
 
     // Also update DRProducerProtocol.java if version changes
     static const uint8_t PROTOCOL_VERSION = 4;
@@ -88,6 +92,11 @@ public:
     }
 
     static int32_t getTestDRBuffer(int32_t parimaryKeyNValue, int32_t partitionId, char *out);
+protected:
+    int8_t m_hashFlag;
+    int64_t m_firstParHash;
+    int64_t m_lastParHash;
+    size_t m_beginTxnUso;
 private:
     void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
 
@@ -105,7 +114,8 @@ private:
             size_t &rowMetadataSz,
             const std::vector<int> *&interestingColumns);
 
-    void updateTxnHash(TableTuple &tuple, int partitionColumn);
+    int64_t getParHashForTuple(TableTuple& tuple, int partitionColumn);
+    bool updateParHash(int64_t parHash);
 
     int64_t m_lastCommittedSpUniqueId;
     int64_t m_lastCommittedMpUniqueId;
