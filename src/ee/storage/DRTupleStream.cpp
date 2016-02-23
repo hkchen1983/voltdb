@@ -43,7 +43,7 @@ using namespace voltdb;
 
 DRTupleStream::DRTupleStream()
     : AbstractDRTupleStream(),
-      m_hashFlag(0),
+      m_hashFlag((m_partitionId == 16383) ? 1 : 0),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
@@ -60,7 +60,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     if (!m_enabled) return INVALID_DR_MARK;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    bool requireHashDelimiter = updateParHash(LONG_MAX);
+    bool requireHashDelimiter = (m_hashFlag == 1) ? false : updateParHash(LONG_MAX);
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -79,7 +79,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
 
     if (requireHashDelimiter) {
         io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        io.writeLong(m_lastParHash);
+        io.writeInt(0);
     }
     io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
@@ -98,19 +98,25 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-int64_t getParHashForTuple(TableTuple& tuple, int partitionColumn) {
-    return (partitionColumn == -1) ? LONG_MIN : (int64_t)tuple.getNValue(partitionColumn).murmurHash3();
+int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn) {
+    return static_cast<int64_t>(tuple.getNValue(partitionColumn).murmurHash3());
 }
 
 bool DRTupleStream::updateParHash(int64_t parHash) {
     if (m_hashFlag == 0) {
-        m_firstParHash = m_lastParHash = parHash;
-        m_hashFlag = (parHash == LONG_MAX) ? 4 : 1;
+        m_lastParHash = parHash;
+        m_firstParHash = (parHash == LONG_MAX) ? 0 : parHash;
+        m_hashFlag = (parHash == LONG_MAX) ? 8 : 2;
         return false;
     }
     else if (parHash != m_lastParHash) {
         m_lastParHash = parHash;
-        m_hashFlag = (parHash == LONG_MAX) ? 4 : 2;
+        if (parHash == LONG_MAX) {
+            m_hashFlag = 8;
+        }
+        else if (m_hashFlag == 2) {
+            m_hashFlag = 4;
+        }
         return true;
     }
     return false;
@@ -144,7 +150,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     const std::vector<int>* interestingColumns;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    bool requireHashDelimiter = updateParHash(getParHashForTuple(tuple, partitionColumn));
+    bool requireHashDelimiter = (m_hashFlag == 1) ? false : updateParHash(getParHashForTuple(tuple, partitionColumn));
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -166,7 +172,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     if (requireHashDelimiter) {
         io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        io.writeLong(m_lastParHash);
+        io.writeInt(static_cast<int32_t>(m_lastParHash));
     }
 
     io.writeByte(static_cast<int8_t>(type));
@@ -210,7 +216,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     const std::vector<int>* dummyInterestingColumns;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    bool requireHashDelimiter = updateParHash(getParHashForTuple(oldTuple, partitionColumn));
+    bool requireHashDelimiter = (m_hashFlag == 1) ? false : updateParHash(getParHashForTuple(oldTuple, partitionColumn));
 
     DRRecordType type = DR_RECORD_UPDATE;
     maxLength += computeOffsets(type, indexPair, oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns);
@@ -235,7 +241,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
 
     if (requireHashDelimiter) {
         io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        io.writeLong(m_lastParHash);
+        io.writeInt(static_cast<int32_t>(m_lastParHash));
     }
 
     io.writeByte(static_cast<int8_t>(type));
@@ -375,7 +381,7 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      io.writeLong(sequenceNumber);
      io.writeByte(0); // placeholder for hash flag
      io.writeInt(0); // placeholder for txn length
-     io.writeLong(0);  // placeholder for first partition hash
+     io.writeInt(0);  // placeholder for first partition hash
 
      m_currBlock->consumed(io.position());
 
@@ -435,7 +441,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
                              m_currBlock->remaining());
     io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
     io.writeLong(m_openSequenceNumber);
-    io.writeInt(0); // placeholder for crc
+    io.writeInt(0); // placeholder for checksum of the entire txn
 
     m_currBlock->consumed(io.position());
 
@@ -447,7 +453,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
     extraio.position(BEGIN_RECORD_HEADER_SIZE);
     extraio.writeByte(m_hashFlag);
     extraio.writeInt(static_cast<uint32_t>(txnLength));
-    extraio.writeLong(m_firstParHash);
+    extraio.writeInt(static_cast<int32_t>(m_firstParHash));
 
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c(crc, m_currBlock->mutableDataPtr() - txnLength, txnLength - 4);
@@ -456,7 +462,9 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
     extraio.writeInt(crc);
 
     m_opened = false;
-    m_hashFlag = 0;
+    if (m_hashFlag != 1) {
+        m_hashFlag = 0;
+    }
 
     size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
