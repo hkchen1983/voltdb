@@ -465,25 +465,26 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
                                 boost::unordered_map<int64_t, PersistentTable*> &tables,
                                 Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
                                 const char *txnStart, int64_t *uniqueId, int64_t *sequenceNumber) {
+    int64_t rowCount = 0;
     // Read the whole txn since there is only one version number at the beginning
     DRRecordType type = static_cast<DRRecordType>(taskInfo->readByte());
     assert(type == DR_RECORD_BEGIN_TXN);
     while (type != DR_RECORD_END_TXN) {
-        rowCount += m_sink.apply(&taskInfo, type, tables, pool, engine, remoteClusterId,
-                                 txnStart, &uniqueId, &sequenceNumber);
+        rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
+                          txnStart, uniqueId, sequenceNumber);
         type = static_cast<DRRecordType>(taskInfo->readByte());
     }
-    rowCount += m_sink.apply(&taskInfo, type, tables, pool, engine, remoteClusterId,
-                             txnStart, &uniqueId, &sequenceNumber);
+    rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
+                      txnStart, uniqueId, sequenceNumber);
+
+    return rowCount;
 }
 
-int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, DRRecordType type,
+int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
                              boost::unordered_map<int64_t, PersistentTable*> &tables,
                              Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
                              const char *txnStart, int64_t *uniqueId, int64_t *sequenceNumber) {
     CachedIndexKeyTuple indexKeyTuple;
-
-    size_t rowCount = rowCostForDRRecord(type);
 
     switch (type) {
     case DR_RECORD_INSERT: {
@@ -753,7 +754,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, DRRecordType t
         throwFatalException("Unrecognized DR record type %d", type);
         break;
     }
-    return static_cast<int64_t>(rowCount);
+    return static_cast<int64_t>(rowCostForDRRecord(type));
 }
 
 }

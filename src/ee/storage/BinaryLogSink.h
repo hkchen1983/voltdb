@@ -42,7 +42,7 @@ public:
                      int64_t *sequenceNumber);
 
 private:
-    int64_t apply(ReferenceSerializeInputLE *taskInfo,
+    int64_t apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
                   boost::unordered_map<int64_t, PersistentTable*> &tables,
                   Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
                   const char *recordStart, int64_t *uniqueId,

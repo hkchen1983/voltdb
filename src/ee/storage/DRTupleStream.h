@@ -45,6 +45,12 @@ public:
     virtual ~DRTupleStream() {
     }
 
+    void configure(CatalogId partitionId) {
+        AbstractDRTupleStream::configure(partitionId);
+        m_hashFlag = (partitionId == 16383) ? 1 : 0;
+        m_firstParHash = 0;
+    }
+
     /**
      * write an insert or delete record to the stream
      * for active-active conflict detection purpose, write full row image for delete records.
@@ -91,7 +97,7 @@ public:
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
 
-    static int32_t getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, char *out);
+    static int32_t getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, int32_t flag, char *out);
 protected:
     int8_t m_hashFlag; // 1 replicated 2 single 4 multi 8 special
     int64_t m_firstParHash;

@@ -43,7 +43,6 @@ using namespace voltdb;
 
 DRTupleStream::DRTupleStream()
     : AbstractDRTupleStream(),
-      m_hashFlag((m_partitionId == 16383) ? 1 : 0),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
@@ -110,6 +109,9 @@ bool DRTupleStream::updateParHash(int64_t parHash) {
         return false;
     }
     else if (parHash != m_lastParHash) {
+        if (m_lastParHash == LONG_MAX) {
+            std::cout << "HAHA " << m_lastParHash << " " << parHash << " " << static_cast<int32_t>(m_hashFlag) << std::endl;
+        }
         m_lastParHash = parHash;
         if (parHash == LONG_MAX) {
             m_hashFlag = 8;
@@ -172,6 +174,9 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     if (requireHashDelimiter) {
         io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        if (m_hashFlag == 8) {
+            std::cout << "HEHE " << m_lastParHash << std::endl;
+        }
         io.writeInt(static_cast<int32_t>(m_lastParHash));
     }
 
@@ -496,7 +501,10 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     return false;
 }
 
-int32_t DRTupleStream::getTestDRBuffer(int32_t primaryKeyNValue, int32_t partitionId, char *outBytes) {
+int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, int32_t flag, char *outBytes) {
+    if (flag == 1) {
+        partitionId = 16383;
+    }
     DRTupleStream stream;
     stream.configure(partitionId);
 
@@ -517,8 +525,8 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t primaryKeyNValue, int32_t partiti
                                                                 columnAllowNull);
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
-    // update the primary key column
-    tuple.setNValue(0, ValueFactory::getIntegerValue(primaryKeyNValue));
+    // set the partition key
+    tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue));
 
     const TableIndex* index = NULL;
     std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
@@ -529,18 +537,27 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t primaryKeyNValue, int32_t partiti
         for (int zz = 0; zz < 5; zz++) {
             stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
+
+        if (flag == 1 || flag == 8) {
+            stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
+        }
+
+        if (flag != 2) {
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue + 1));
+            for (int zz = 0; zz < 5; zz++) {
+                stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            }
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue));
+        }
+
         stream.endTransaction(uid);
         ii += 5;
     }
 
     TupleSchema::freeTupleSchema(schema);
 
-//    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
-//    int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
-//    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
-//    stream.endTransaction(uid);
-
-    int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, partitionId);
+    int64_t committedUID = UniqueId::makeIdFromComponents(95, 0, partitionId);
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
     size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;
