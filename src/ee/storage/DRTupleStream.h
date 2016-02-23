@@ -91,7 +91,7 @@ public:
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
 
-    static int32_t getTestDRBuffer(int32_t parimaryKeyNValue, int32_t partitionId, char *out);
+    static int32_t getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, char *out);
 protected:
     int8_t m_hashFlag; // 1 replicated 2 single 4 multi 8 special
     int64_t m_firstParHash;
