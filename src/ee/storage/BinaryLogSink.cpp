@@ -750,6 +750,11 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
 
         break;
     }
+    // for ee test only, records of this type should have been removed in Topend before reaching here
+    case DR_RECORD_HASH_DELIMITER: {
+        int32_t __attribute__ ((unused)) parHash = taskInfo->readInt();
+        break;
+    }
     default:
         throwFatalException("Unrecognized DR record type %d", type);
         break;
