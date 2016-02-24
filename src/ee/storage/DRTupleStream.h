@@ -47,7 +47,7 @@ public:
 
     void configure(CatalogId partitionId) {
         AbstractDRTupleStream::configure(partitionId);
-        m_hashFlag = (partitionId == 16383) ? 1 : 0;
+        m_hashFlag = (partitionId == 16383) ? TXN_PAR_HASH_REPLICATED : TXN_PAR_HASH_PLACEHOLDER;
         m_firstParHash = 0;
     }
 
@@ -99,7 +99,7 @@ public:
 
     static int32_t getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, int32_t flag, char *out);
 protected:
-    int8_t m_hashFlag; // 1 replicated 2 single 4 multi 8 special
+    DRTxnPartitionHashFlag m_hashFlag;
     int64_t m_firstParHash;
     int64_t m_lastParHash;
     size_t m_beginTxnUso;

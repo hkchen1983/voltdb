@@ -40,6 +40,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX, HASH_DELIMITER;
     }
 
+    public enum DRTxnPartitionHashFlag {
+        PLACEHOLDER,
+        REPLICATED,
+        SINGLE,
+        MULTI,
+        SPECIAL
+    }
+
     public static enum DRRowType {
         EXISTING_ROW,
         EXPECTED_ROW,

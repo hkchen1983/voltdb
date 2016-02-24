@@ -501,6 +501,17 @@ enum DRRecordType {
     DR_RECORD_HASH_DELIMITER = 8
 };
 
+// ------------------------------------------------------------------
+// Flags of DR Transaction Partition Hash
+// ------------------------------------------------------------------
+enum DRTxnPartitionHashFlag {
+    TXN_PAR_HASH_PLACEHOLDER = 0,
+    TXN_PAR_HASH_REPLICATED = 1,
+    TXN_PAR_HASH_SINGLE = 2,
+    TXN_PAR_HASH_MULTI = 3,
+    TXN_PAR_HASH_SPECIAL = 4
+};
+
 inline size_t rowCostForDRRecord(DRRecordType type) {
     // Warning: Currently, the PersistentTableUndo*Actions rely on
     // DR_RECORD_{0}_BY_INDEX costing the same as DR_RECORD_{0}
