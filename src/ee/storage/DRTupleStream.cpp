@@ -109,9 +109,6 @@ bool DRTupleStream::updateParHash(int64_t parHash) {
         return false;
     }
     else if (parHash != m_lastParHash) {
-        if (m_lastParHash == LONG_MAX) {
-            std::cout << "HAHA " << m_lastParHash << " " << parHash << " " << static_cast<int32_t>(m_hashFlag) << std::endl;
-        }
         m_lastParHash = parHash;
         if (parHash == LONG_MAX) {
             m_hashFlag = 8;
@@ -174,9 +171,6 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     if (requireHashDelimiter) {
         io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        if (m_hashFlag == 8) {
-            std::cout << "HEHE " << m_lastParHash << std::endl;
-        }
         io.writeInt(static_cast<int32_t>(m_lastParHash));
     }
 
